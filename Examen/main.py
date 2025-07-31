@@ -1,54 +1,66 @@
-from fastapi import FastAPI
+from pydoc import pager
+from typing import List
+from fastapi import FastAPI, Response
 from pydantic import BaseModel
-from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 app = FastAPI()
 
 
-@app.get("/hello")
-def read_hello(request: Request, is_teacher: bool = None, name: str = "Non défini"):
-    accept_headers = request.headers.get("Accept")
-    if accept_headers != "text/plain":
-        return JSONResponse({"message": "Unsupported Media Type"}, status_code=400)
-    if name == "Non défini" and is_teacher is None:
-        return JSONResponse({"message": "Hello world"}, status_code=200)
-    if is_teacher is None:
-        is_teacher = False
-    if is_teacher:
-        return JSONResponse({"message": f"Hello teacher {name}"}, status_code=200)
+@app.get("/ping")
+def pong_affiche(): 
+    return Response(encoding = "UTF-8",
+             status_code = 200, content = "pong",
+               media_type = "text/plain")
+
+@app.get("/home")
+def Say_welcome():
+    with open ("welcome.html","r", encoding="utf-8") as file :
+        html_content = file.read()
+        return Response(content=html_content,status_code=200, media_type="text/html")
+    
+@app.get("/{full_path:path}")
+def error (full_path: str): 
+    with open("not_found.html","r", encoding="utf_8") as file : 
+        html_content = file.read()
+        return Response(content=html_content,status_code=404, media_type="text/html")
+
+
+class Publication(BaseModel):
+    author : str
+    title : str
+    content : str
+    creation_datetime : str
+
+
+    
+@app.post("/posts")
+def post(updated: List[Publication]):
+    global posts
+    existing_author = {Publication["author"]: Publication for Publication in posts}
+
+    for  publication in updated:
+        if Publication.author in existing_author:
+            if existing_author[Publication.author] != pager.dict():
+                for i, p in enumerate(posts):
+                    if p["author"] == pager.author:
+                        posts[i] = pager.dict()
+        else:
+            posts.append(pager.dict())
+    
+    return posts
+
+
+@app.get("/posts")
+def get_post():
+    return posts
+
+class Put_post(BaseModel) :
+    title : str
+
+@app.put("/posts")
+def put_post(updated_posts : List[Put_post]):
+    if len(updated_posts) == 0:
+        return JSONResponse(content={"error message" : "0 taske to updated"},status_code=400)
     else:
-        return JSONResponse({"message": f"Hello {name}"}, status_code=200)
-
-
-class WelcomeRequest(BaseModel):
-    name: str
-
-
-@app.post("/welcome")
-def welcome_user(request: WelcomeRequest):
-    return {f"Bienvenue {request.name}"}
-
-
-class SecretPayload(BaseModel):
-    secret_code: int
-
-
-@app.put("/top-secret")
-def put_top_secret(request: Request, request_body: SecretPayload):
-    auth_header = request.headers.get("Authorization")
-    if auth_header != "my-secret-key":
-        return JSONResponse(
-            status_code=403,
-            content={"error": f"Unauthorized header received: {auth_header}"}
-        )
-
-    secret_code = request_body.secret_code
-    code_length = len(str(secret_code))
-    if code_length != 4:
-        return JSONResponse(
-            status_code=400,
-            content={"error": f"Le code fourni n’est pas à 4 chiffres mais {code_length} chiffres."}
-        )
-
-    return JSONResponse(content={"message": f"Voici le code {secret_code}"}, status_code=200)
+        for updated_posts in updated_posts :
